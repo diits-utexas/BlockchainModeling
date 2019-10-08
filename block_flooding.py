@@ -7,12 +7,15 @@ class BlockFlooding:
   def __init__(self, N, block_rate):
     self.N = N
     self.block_rate = block_rate
+    self.event_rate = (self.N + self.block_rate)
 
     self.time = 0
     self.times_of_consistency = [0]
 
-    self.blocks_per_ttc = []
-    
+    self.num_blocks_total = 1
+    self.num_events_total = 1
+    self.num_blocks_behind_avg = 0 # TODO: divide by (self.N* num_blocks_total)
+    self.num_consistent_peers_avg = 0 # TODO: divide by (self.N* num_blocks_total)
 
     initial_peer = random.randint(self.N)
     self.block_array = np.zeros((1, self.N))
@@ -27,20 +30,23 @@ class BlockFlooding:
       if(np.all(self.block_array[0, :] == 1.)):
         self.block_array = np.delete(self.block_array, 0, 0)
 
-  def round(self):
+  def event(self):
     #  Perform a single round of floodsng.
+    self.num_events_total += 1
+
     self.clean_block_array()
 
     #  Check if it is a time of consistency.
     if (self.block_array.shape == (0, self.N)):
       self.times_of_consistency.append(self.time)
 
-    beta = 1./(self.N + self.block_rate)
+    beta = 1./self.event_rate
     self.time += random.exponential(beta)
 
     action_type_sample = random.random()
     if (action_type_sample < (1.0*self.block_rate)/(1.0*self.N + 1.0*self.block_rate)):
       #print('arrival')
+      self.num_blocks_total += 1
 
       #  Add a new block to the block array.
       new_block_peer = random.randint(self.N)
@@ -85,21 +91,35 @@ class BlockFlooding:
 
         else:
           pass
+    self.num_blocks_behind_avg += (1.0*self.block_array.size) - np.sum(self.block_array)
+    for peer in range(self.N):
+      if np.all(self.block_array[:, peer] == 1):
+        self.num_consistent_peers_avg += 1
     #raw_input()
 
+  def compute_stats(self):
+    times_of_consistency_diff = np.diff(self.times_of_consistency)
+    self.time_to_consistency_avg = np.mean(times_of_consistency_diff)
+
+    self.num_blocks_behind_avg = (1.0*self.num_blocks_behind_avg)/(1.0 * self.N * self.num_events_total)
+    self.num_consistent_peers_avg = (1.0*self.num_consistent_peers_avg)/(1.0 * self.N * self.num_events_total)
+
 def main():
-  N = 50
+  N = 30
   block_rates = np.linspace(0, 0.5, 51)
   
   for block_rate in block_rates:
     BF = BlockFlooding(N, block_rate)
     while (len(BF.times_of_consistency) < 10001):
-      BF.round()
+      BF.event()
       print('\r' + 'Times of Consistency: ' + str(len(BF.times_of_consistency))),
 
+    BF.compute_stats()
     times_of_consistency_diff = np.diff(BF.times_of_consistency)
     print ('\rMean time to consistency with block rate ' + str(block_rate) + ': '
             + str(np.mean(times_of_consistency_diff)))
+    print ('Mean blocks behind: ' + str(BF.num_blocks_behind_avg))
+    print ('Mean fraction consistent: ' + str(BF.num_consistent_peers_avg))
 
 if __name__=='__main__':
   main()
