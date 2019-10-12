@@ -105,17 +105,26 @@ class BlockFlooding:
     self.num_consistent_peers_avg = (1.0*self.num_consistent_peers_avg)/(1.0 * self.N * self.num_events_total)
 
 def main():
-  num_peers = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+  outfile = 'temp_output.txt'
+  num_peers = [25, 50, 75, 100, 125, 150, 175, 200]
   block_rates = np.linspace(0, 0.5, 51)
   max_block_rates = []
+
+  data_store = {N : {'block_rate' : [], 'time_to_consistency' : [],
+                     'num_blocks_behind' : [], 'frac_consistent' : []}
+                for N in num_peers}
+
+  print num_peers
+
   
 #  for block_rate in block_rates:
   for N in num_peers:
-    print N
+    print ('\rN = ' + str(N))
     fraction_consistent = 1
 
     block_rate = 0.01
     while (fraction_consistent >= 0.01):
+      print ('\r' + str(block_rate)),
       BF = BlockFlooding(N, block_rate)
       while (len(BF.times_of_consistency) < 10001):
         BF.event()
@@ -126,6 +135,10 @@ def main():
       #print ('Mean time to consistency: ' + str(BF.time_to_consistency_avg))
       #print ('Mean blocks behind: ' + str(BF.num_blocks_behind_avg))
       #print ('Mean fraction consistent: ' + str(BF.num_consistent_peers_avg))
+      data_store[N]['block_rate'] = np.append(data_store[N]['block_rate'], block_rate)
+      data_store[N]['time_to_consistency'] = np.append(data_store[N]['time_to_consistency'], BF.time_to_consistency_avg)
+      data_store[N]['num_blocks_behind'] = np.append(data_store[N]['num_blocks_behind'], BF.num_blocks_behind_avg)
+      data_store[N]['frac_consistent'] = np.append(data_store[N]['frac_consistent'], BF.num_consistent_peers_avg)
 
       fraction_consistent = BF.num_consistent_peers_avg
 
@@ -133,9 +146,9 @@ def main():
 
     max_block_rates = np.append(max_block_rates, block_rate)
 
-
-    print num_peers
-    print max_block_rates
+  with open(outfile, 'w') as f:
+    f.write(data_store)
+  print data_store  
 
 if __name__=='__main__':
   main()
