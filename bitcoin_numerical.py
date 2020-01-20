@@ -1,4 +1,5 @@
 import sys, os
+import datetime
 
 import numpy as np
 import numpy.random as random
@@ -29,6 +30,7 @@ class BlockFlooding:
     self.num_events_total = 0
     self.num_blocks_behind_avg = 0
     self.num_consistent_peers_avg = 0
+    self.frac_consistent_peers = 0
 
     # State-Based Parameters
     self.block_array = np.zeros((0, self.N))
@@ -80,6 +82,9 @@ class BlockFlooding:
     if (self.consistent):
       #print 'New Cycle'
       self.time = self.block_arrival_times[self.block_arrival_index]
+      self.dt = self.time - self.cycle_begin
+      self.compute_running_stats()
+
       self.busy_period_begin = self.time
       self.block_arrival_index += 1
       self.consistent = False
@@ -90,12 +95,13 @@ class BlockFlooding:
       self.block_array = np.append(self.block_array, np.zeros((1, self.N)), 0)
       self.block_array[-1, new_block_peer] = 1
 
-      self.time += random.exponential(1./self.transmission_rate)
-
+      return
 
     # Update the system time
     else:
-      self.time += random.exponential(1./self.transmission_rate)
+      self.dt = random.exponential(1./self.transmission_rate)
+      self.time += self.dt
+      self.compute_running_stats()
 
       # Arrival
       while (self.time > self.block_arrival_times[self.block_arrival_index]):
@@ -167,30 +173,33 @@ class BlockFlooding:
             #print self.cycle_begin
             #print self.block_array
             self.consistent = True
-
-        else:
-          pass
-    self.compute_running_stats()
+      else:
+        return
 
   def compute_running_stats(self):
-    self.num_blocks_behind_avg += (1.0*(self.block_array.size) - np.sum(self.block_array))
-    for peer in range(self.N):
-      if np.all(self.block_array[:, peer] == 1):
-        self.num_consistent_peers_avg += 1
+    time_interval = self.dt/(1.0*self.N) 
+
+    num_active_blocks = self.block_array.shape[0]
+    if num_active_blocks > 0:
+      num_blocks_per_peer = np.sum(self.block_array, axis = 0)
+      num_consistent_peers = np.sum(num_blocks_per_peer == num_active_blocks)
+      self.frac_consistent_peers += num_consistent_peers * time_interval
+    else:
+      self.frac_consistent_peers += 1.0 * self.N * time_interval
+
+    self.num_blocks_behind_avg += self.block_array.size - np.sum(num_blocks_per_peer)) * time_interval
 
   def compute_stats(self):
     self.mean_busy_period = np.mean(self.busy_period_lengths)
     self.mean_cycle_length = np.mean(self.cycle_lengths)
-    self.num_blocks_behind_avg = (1.0*self.num_blocks_behind_avg)/(self.time*self.N)
-    self.frac_consistent_peers_avg = (1.0*self.num_consistent_peers_avg)/(self.time*self.N)
-
+    self.num_blocks_behind_avg = (1.0*self.num_blocks_behind_avg)/self.time
+    self.frac_consistent_peers_avg = (1.0*self.frac_consistent_peers)/self.time
 
 def run_simulate(N, block_rate, bandwidth, block_arrival_times, num_cycles, output):
   BF = BlockFlooding(N, block_rate, bandwidth, block_arrival_times)
 
   while BF.num_cycles < num_cycles:
     BF.event()
-    print BF.num_cycles
 
   BF.compute_stats()
 
@@ -204,7 +213,7 @@ def main():
   bandwidth = 73.1
   beta = 1./block_rate
 
-  num_cycles = 2000
+  num_cycles = 500
 
   arrival_times = 0
   block_arrival_times = []
@@ -212,17 +221,23 @@ def main():
     arrival_times += random.exponential(beta)
     block_arrival_times = np.append(block_arrival_times, arrival_times)
 
-  num_processes = 1
+  num_processes = 8
 
   output = mp.Queue()
 
-  processes = [mp.Process(target=run_simulate, args=(100, block_rate, bandwidth, block_arrival_times, num_cycles, output)) for x in range(num_processes)]
+  processes = [mp.Process(target=run_simulate, 
+                          args=(num_peers, block_rate, bandwidth, block_arrival_times,
+                                num_cycles, output)) for x in range(num_processes)]
 
+  time_start = datetime.datetime.now()
   for p in processes:
     p.start()
 
   for p in processes:
     p.join()
+  time_end = datetime.datetime.now()
+
+  print ('Time Elapsed: ' + str(time_end - time_start))
 
   results = [output.get() for p in processes]
 
