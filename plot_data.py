@@ -1,125 +1,127 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-
 def main():
-  # get the information as a dictionary
-  s = open('data.txt', 'r').read()
-  data = eval(s)
+    infile = open('output_growth.txt', 'r').read()
+    data = eval(infile)
 
-  data_keys_sorted = data.keys()
-  data_keys_sorted.sort()
+    time_to_consistency_10 = data[10]['busy_period']
+    cycle_length_10 = data[10]['cycle_length']
+    age_of_information_10 = data[10]['age_of_information']
+    consistency_fraction_10 = data[10]['consistency_fraction']
+    growth_rate_10 = data[10]['growth_rate']
+    time_to_consistency_20 = data[20]['busy_period']
+    cycle_length_20 = data[20]['cycle_length']
+    age_of_information_20 = data[20]['age_of_information']
+    consistency_fraction_20 = data[20]['consistency_fraction']
+    growth_rate_20 = data[20]['growth_rate']
+    time_to_consistency_30 = data[30]['busy_period']
+    cycle_length_30 = data[30]['cycle_length']
+    age_of_information_30 = data[30]['age_of_information']
+    consistency_fraction_30 = data[30]['consistency_fraction']
+    growth_rate_30 = data[30]['growth_rate']
 
-  # Plot 1
-  plt.figure(1)
-  fig_1_x = data_keys_sorted
-  fig_1_y = [data[i]['block_rate'][-1] for i in data_keys_sorted]
+    num_data_10 = len(time_to_consistency_10)
+    num_data_20 = len(time_to_consistency_20)
+    num_data_30 = len(time_to_consistency_30)
 
-  plt.plot(fig_1_x, fig_1_y, 'o-')
-  #plt.title('Maximum Block Rate vs. Number of Peers')
-  plt.xlabel('Number of Peers')
-  plt.ylabel('Maximum Block Rate')
+    ind_10 = np.sum([cycle_length_10[i][1] < 150 for i in range(num_data_10)])
+    ind_20 = np.sum([cycle_length_20[i][1] < 150 for i in range(num_data_20)])
+    ind_30 = np.sum([cycle_length_30[i][1] < 150 for i in range(num_data_30)])
 
+    
 
-  # Plot 2
-  plt.figure(2)
-  fig_2_x_25 = data[25]['block_rate']
-  fig_2_y_25 = data[25]['time_to_consistency']
-  fig_2_x_50 = data[50]['block_rate']
-  fig_2_y_50 = data[50]['time_to_consistency']
-  fig_2_x_75 = data[75]['block_rate']
-  fig_2_y_75 = data[75]['time_to_consistency']
-  fig_2_x_100 = data[100]['block_rate']
-  fig_2_y_100 = data[100]['time_to_consistency']
-  fig_2_x_125 = data[125]['block_rate']
-  fig_2_y_125 = data[125]['time_to_consistency']
-  fig_2_x_150 = data[150]['block_rate']
-  fig_2_y_150 = data[150]['time_to_consistency']
-  fig_2_x_175 = data[175]['block_rate']
-  fig_2_y_175 = data[175]['time_to_consistency']
-  fig_2_x_200 = data[200]['block_rate']
-  fig_2_y_200 = data[200]['time_to_consistency']
+    plt.figure(1)
+    plt.errorbar([time_to_consistency_10[i][0] for i in range(num_data_10)],
+                 [time_to_consistency_10[i][1] for i in range(num_data_10)],
+                 [2*time_to_consistency_10[i][2] for i in range(num_data_10)], 
+                 fmt='o', label='N = 10')
+    plt.errorbar([time_to_consistency_20[i][0] for i in range(num_data_20)],
+                 [time_to_consistency_20[i][1] for i in range(num_data_20)],
+                 [2*time_to_consistency_20[i][2] for i in range(num_data_20)], 
+                 fmt='o', label='N = 20')
+    plt.errorbar([time_to_consistency_30[i][0] for i in range(num_data_30)],
+                 [time_to_consistency_30[i][1] for i in range(num_data_30)],
+                 [2*time_to_consistency_30[i][2] for i in range(num_data_30)], 
+                 fmt='o', label='N = 30')
+    plt.title('Time to Consistency vs. Block Arrival Rate')
+    plt.xlabel('Block Arrival Rate (blocks / s)')
+    plt.ylabel('Time to Consistency (s)')
+    plt.legend()
+    
+    plt.figure(2)
+    plt.errorbar([cycle_length_10[i][0] for i in range(ind_10)],
+                 [cycle_length_10[i][1] for i in range(ind_10)],
+                 [2*cycle_length_10[i][2] for i in range(ind_10)], 
+                 fmt='o', label='N = 10')
+    plt.errorbar([cycle_length_20[i][0] for i in range(ind_20)],
+                 [cycle_length_20[i][1] for i in range(ind_20)],
+                 [2*cycle_length_20[i][2] for i in range(ind_20)], 
+                 fmt='o', label='N = 20')
+    plt.errorbar([cycle_length_30[i][0] for i in range(ind_30)],
+                 [cycle_length_30[i][1] for i in range(ind_30)],
+                 [2*cycle_length_30[i][2] for i in range(ind_30)], 
+                 fmt='o', label='N = 30')
+    plt.title('Cycle Length vs. Block Arrival Rate')
+    plt.xlabel('Block Arrival Rate (blocks / s)')
+    plt.ylabel('Cycle Length (s)')
+    plt.legend()
+    
+    plt.figure(3)
+    plt.errorbar([age_of_information_10[i][0] for i in range(num_data_10)],
+                 [age_of_information_10[i][1] for i in range(num_data_10)],
+                 [2*age_of_information_10[i][2] for i in range(num_data_10)], 
+                 fmt='o', label='N = 10')
+    plt.errorbar([age_of_information_20[i][0] for i in range(num_data_20)],
+                 [age_of_information_20[i][1] for i in range(num_data_20)],
+                 [2*age_of_information_20[i][2] for i in range(num_data_20)], 
+                 fmt='o', label='N = 20')
+    plt.errorbar([age_of_information_30[i][0] for i in range(num_data_30)],
+                 [age_of_information_30[i][1] for i in range(num_data_30)],
+                 [2*age_of_information_30[i][2] for i in range(num_data_30)], 
+                 fmt='o', label='N = 30')
+    plt.title('Age of Information vs. Block Arrival Rate')
+    plt.xlabel('Block Arrival Rate (blocks / s)')
+    plt.ylabel('Age of Information (blocks)')
+    plt.legend()
+    
+    plt.figure(4)
+    plt.errorbar([consistency_fraction_10[i][0] for i in range(num_data_10)],
+                 [consistency_fraction_10[i][1] for i in range(num_data_10)],
+                 [2*consistency_fraction_10[i][2] for i in range(num_data_10)], 
+                 fmt='o', label='N = 10')
+    plt.errorbar([consistency_fraction_20[i][0] for i in range(num_data_20)],
+                 [consistency_fraction_20[i][1] for i in range(num_data_20)],
+                 [2*consistency_fraction_20[i][2] for i in range(num_data_20)], 
+                 fmt='o', label='N = 20')
+    plt.errorbar([consistency_fraction_30[i][0] for i in range(num_data_30)],
+                 [consistency_fraction_30[i][1] for i in range(num_data_30)],
+                 [2*consistency_fraction_30[i][2] for i in range(num_data_30)], 
+                 fmt='o', label='N = 30')
+    plt.title('Consistency Fraction vs. Block Arrival Rate')
+    plt.xlabel('Block Arrival Rate (blocks / s)')
+    plt.ylabel('Consistency Fraction')
+    plt.legend()
 
-  plt.plot(#fig_2_x_25, fig_2_y_25, 'o-',
-           fig_2_x_50, fig_2_y_50, 'o-', label='N = 50')
-           #fig_2_x_75, fig_2_y_75, 'o-',
-  plt.plot(fig_2_x_100, fig_2_y_100, 'o-', label='N = 100')
-           #fig_2_x_125, fig_2_y_125, 'o-',
-  plt.plot(fig_2_x_150, fig_2_y_150, 'o-', label='N = 150')
-           #fig_2_x_175, fig_2_y_175, 'o-',
-  plt.plot(fig_2_x_200, fig_2_y_200, 'o-', label='N = 200')
-
-  plt.xlabel('Block Rate')
-  plt.ylabel('Mean Time to Consistency')
-  plt.legend()
-
-
-  # Plot 3
-  plt.figure(3)
-  fig_3_x_25 = data[25]['block_rate']
-  fig_3_y_25 = data[25]['num_blocks_behind']
-  fig_3_x_50 = data[50]['block_rate']
-  fig_3_y_50 = data[50]['num_blocks_behind']
-  fig_3_x_75 = data[75]['block_rate']
-  fig_3_y_75 = data[75]['num_blocks_behind']
-  fig_3_x_100 = data[100]['block_rate']
-  fig_3_y_100 = data[100]['num_blocks_behind']
-  fig_3_x_125 = data[125]['block_rate']
-  fig_3_y_125 = data[125]['num_blocks_behind']
-  fig_3_x_150 = data[150]['block_rate']
-  fig_3_y_150 = data[150]['num_blocks_behind']
-  fig_3_x_175 = data[175]['block_rate']
-  fig_3_y_175 = data[175]['num_blocks_behind']
-  fig_3_x_200 = data[200]['block_rate']
-  fig_3_y_200 = data[200]['num_blocks_behind']
-
-  plt.plot(#fig_3_x_25, fig_3_y_25, 'o-',
-           fig_3_x_50, fig_3_y_50, 'o-', label='N = 50')
-           #fig_3_x_75, fig_3_y_75, 'o-',
-  plt.plot(fig_3_x_100, fig_3_y_100, 'o-', label='N = 100')
-           #fig_3_x_125, fig_3_y_125, 'o-',
-  plt.plot(fig_3_x_150, fig_3_y_150, 'o-', label='N = 150')
-           #fig_3_x_175, fig_3_y_175, 'o-',
-  plt.plot(fig_3_x_200, fig_3_y_200, 'o-', label='N = 200')
- 
-  plt.xlabel('Block Rate')
-  plt.ylabel('Mean Number of Blocks Behind')
-  plt.legend()
-
-
-  # Plot 4
-  plt.figure(4)
-  fig_4_x_25 = data[25]['block_rate']
-  fig_4_y_25 = data[25]['frac_consistent']
-  fig_4_x_50 = data[50]['block_rate']
-  fig_4_y_50 = data[50]['frac_consistent']
-  fig_4_x_75 = data[75]['block_rate']
-  fig_4_y_75 = data[75]['frac_consistent']
-  fig_4_x_100 = data[100]['block_rate']
-  fig_4_y_100 = data[100]['frac_consistent']
-  fig_4_x_125 = data[125]['block_rate']
-  fig_4_y_125 = data[125]['frac_consistent']
-  fig_4_x_150 = data[150]['block_rate']
-  fig_4_y_150 = data[150]['frac_consistent']
-  fig_4_x_175 = data[175]['block_rate']
-  fig_4_y_175 = data[175]['frac_consistent']
-  fig_4_x_200 = data[200]['block_rate']
-  fig_4_y_200 = data[200]['frac_consistent']
-
-  plt.plot(#fig_4_x_25, fig_4_y_25, 'o-',
-           fig_4_x_50, fig_4_y_50, 'o-', label='N = 50')
-           #fig_4_x_75, fig_4_y_75, 'o-',
-  plt.plot(fig_4_x_100, fig_4_y_100, 'o-', label='N = 100')
-           #fig_4_x_125, fig_4_y_125, 'o-',
-  plt.plot(fig_4_x_150, fig_4_y_150, 'o-', label='N = 150')
-           #fig_4_x_175, fig_4_y_175, 'o-',
-  plt.plot(fig_4_x_200, fig_4_y_200, 'o-', label='N = 200')
-
-  plt.xlabel('Block Rate')
-  plt.ylabel('Mean Fraction of Peers Consistent')
-  plt.legend()
-
-  plt.show()
+    plt.figure(5)
+    plt.errorbar([growth_rate_10[i][0] for i in range(num_data_10)],
+                 [growth_rate_10[i][1] for i in range(num_data_10)],
+                 [2*growth_rate_10[i][2] for i in range(num_data_10)], 
+                 fmt='o', label='N = 10')
+    plt.errorbar([growth_rate_20[i][0] for i in range(num_data_20)],
+                 [growth_rate_20[i][1] for i in range(num_data_20)],
+                 [2*growth_rate_20[i][2] for i in range(num_data_20)], 
+                 fmt='o', label='N = 20')
+    plt.errorbar([growth_rate_30[i][0] for i in range(num_data_30)],
+                 [growth_rate_30[i][1] for i in range(num_data_30)],
+                 [2*growth_rate_30[i][2] for i in range(num_data_30)], 
+                 fmt='o', label='N = 30')
+    plt.title('Distinguished Path Growth Rate vs. Block Arrival Rate')
+    plt.xlabel('Block Arrival Rate (blocks / s)')
+    plt.ylabel('Distinguished Path Growth Rate (blocks / s)')
+    plt.legend()
+    
+    plt.show()
 
 if __name__=='__main__':
   main()

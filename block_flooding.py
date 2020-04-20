@@ -1,3 +1,5 @@
+import multiprocessing as mp
+
 import numpy as np
 import numpy.random as random
 
@@ -20,10 +22,12 @@ class BlockFlooding:
     self.num_blocks_total = 0
     self.num_events_total = 0
     self.num_blocks_behind_avg = 0
-    self.num_consistent_peers_avg = 0
+    self.frac_consistent_peers = 0
 
     # State-Based Parameters
     self.block_array = np.zeros((0, self.N))
+    self.block_heights = np.zeros(0)
+    self.peer_heights = np.zeros(self.N)
     self.consistent = True
 
   def clean_block_array(self):
@@ -36,6 +40,7 @@ class BlockFlooding:
       for index in range(num_current_blocks):
         if(np.all(self.block_array[0, :] == 1.)):
           self.block_array = np.delete(self.block_array, 0, 0)
+          self.block_heights = np.delete(self.block_heights, 0)
 
   def event(self):
     #  Perform a single round of flooding.
@@ -44,8 +49,9 @@ class BlockFlooding:
     self.clean_block_array()
 
     beta = 1./self.event_rate
-    old_time = self.time
-    self.time += random.exponential(beta)
+    self.dt = random.exponential(beta)
+    self.time += self.dt
+    self.compute_running_stats()
 
     action_type_sample = random.random()
 
@@ -64,6 +70,12 @@ class BlockFlooding:
       new_block_peer = random.randint(self.N)
       self.block_array = np.append(self.block_array, np.zeros((1, self.N)), 0)
       self.block_array[-1, new_block_peer] = 1
+
+      #  Set the block heights
+      self.peer_heights[new_block_peer] += 1
+      self.block_heights = np.append(self.block_heights, self.peer_heights[new_block_peer])
+
+      return
      
     # Transmission 
     else:
@@ -72,6 +84,9 @@ class BlockFlooding:
       #    sending peer has that the receiving peer does not
       #    have.
       #print('transmission')
+      if self.consistent:
+        return
+
       if not (self.block_array.shape == (0, self.N)):
         sending_peer = random.randint(self.N)
         receiving_peer = random.randint(self.N-1)
@@ -102,7 +117,11 @@ class BlockFlooding:
           if (send_block):
             self.block_array[block_to_send, receiving_peer] = 1
 
-            if (np.all(self.block_array == 1) and self.consistent == False):
+            #  Update the block height
+            self.peer_heights[receiving_peer] = self.block_heights[block_to_send]
+
+            if (np.all(self.block_array == 1)):
+              #print self.peer_heights
               # Check if it is a time of consistency
               if (self.busy_period_begin < self.cycle_begin):
                 print 'ERROR 2'
@@ -110,6 +129,10 @@ class BlockFlooding:
                 print self.busy_period_begin
                 print self.cycle_begin
                 raw_input()
+              #if (not np.all(self.peer_heights == self.peer_heights[0])):
+                #print 'ERROR 3'
+                #print self.peer_heights
+                #raw_input()
               self.busy_period_lengths.append(self.time - self.busy_period_begin)
               self.cycle_lengths.append(self.time - self.cycle_begin)
               self.cycle_begin = self.time
@@ -119,55 +142,86 @@ class BlockFlooding:
               #print self.cycle_begin
               #print self.block_array
               self.consistent = True
+          return
 
         else:
-          pass
-    self.num_blocks_behind_avg += (1.0*self.block_array.size) - np.sum(self.block_array)
-    for peer in range(self.N):
-      if np.all(self.block_array[:, peer] == 1):
-        self.num_consistent_peers_avg += 1
+          return
+
+  def compute_running_stats(self):
+    time_interval = self.dt/(1.0*self.N)
+
+    num_active_blocks = self.block_array.shape[0]
+    num_blocks_per_peer = np.sum(self.block_array, axis = 0)
+    if num_active_blocks > 0:
+      num_consistent_peers = np.sum(num_blocks_per_peer == num_active_blocks)
+      self.frac_consistent_peers += num_consistent_peers * time_interval
+      self.num_blocks_behind_avg += (self.block_array.size - np.sum(num_blocks_per_peer)) * time_interval
+    else:
+      self.frac_consistent_peers += 1.0 * self.N * time_interval
+      # in this case nobody is behind so no need to update self.num_blocks_behind_avg
 
   def compute_stats(self):
-    self.num_blocks_behind_avg = (1.0*self.num_blocks_behind_avg)/(1.0 * self.N * self.num_events_total)
-    self.num_consistent_peers_avg = (1.0*self.num_consistent_peers_avg)/(1.0 * self.N * self.num_events_total)
+    self.mean_busy_period = np.mean(self.busy_period_lengths)
+    self.mean_cycle_length = np.mean(self.cycle_lengths)
+    self.num_blocks_behind_avg = self.num_blocks_behind_avg / self.time
+    self.frac_consistent_peers = self.frac_consistent_peers / self.time
+
+
+def run_simulate(N, block_rate, num_cycles, seed, output):
+  random.seed(seed)
+  BF = BlockFlooding(N, block_rate)
+  while (len(BF.cycle_lengths) < num_cycles):
+    BF.event()
+  BF.compute_stats()
+
+  output.put([BF.mean_busy_period, BF.mean_cycle_length,
+              BF.num_blocks_behind_avg, BF.frac_consistent_peers,
+              (1.0*block_rate*BF.peer_heights[0])/(1.0*BF.num_blocks_total)])
 
 def main():
-  num_peers = [10, 20, 30, 40, 50]
-  num_peers = [10]
-  block_rates = np.linspace(0, 0.5, 51)
-  max_block_rates = []
+  num_peers = [10 * (i+1) for i in range(3)]
 
-  data_store = {N : {'block_rate' : [], 'time_to_consistency' : [], 'cycle_length' : [],
-                     'num_blocks_behind' : [], 'frac_consistent' : []}
-                for N in num_peers}
+  busy_period_data = []
+  cycle_length_data = []
+  age_of_information_data = []
+  frac_consistent_data = []
 
+  num_cycles = 500
+
+  output = mp.Queue()
+  
+  num_processes = 30
+
+  block_rate = 0
+
+  data_store = {10: {'busy_period': [], 'cycle_length': [], 'age_of_information': [], 'consistency_fraction': [], 'growth_rate' : []},
+                20: {'busy_period': [], 'cycle_length': [], 'age_of_information': [], 'consistency_fraction': [], 'growth_rate' : []},
+                30: {'busy_period': [], 'cycle_length': [], 'age_of_information': [], 'consistency_fraction': [], 'growth_rate' : []}}
 
   for N in num_peers:
-    #print ('\rN = ' + str(N))
-    fraction_consistent = 1
+    frac_consistent = 1
 
     block_rate = 0.01
-    while (fraction_consistent >= 0.01):
-      #print ('\nBLOCK RATE:' + str(block_rate)),
-      BF = BlockFlooding(N, block_rate)
-      while (len(BF.cycle_lengths) < 11):
-        BF.event()
+    while (frac_consistent >= 0.01):
+      processes = [mp.Process(target = run_simulate, args = (N, block_rate, num_cycles, x, output))
+                    for x in range(num_processes)]
 
-      BF.compute_stats()
-      data_store[N]['block_rate'] = np.append(data_store[N]['block_rate'], block_rate)
-      data_store[N]['time_to_consistency'] = np.append(data_store[N]['time_to_consistency'], BF.busy_period_lengths)
-      data_store[N]['cycle_length'] = np.append(data_store[N]['cycle_length'], BF.cycle_lengths)
-      data_store[N]['num_blocks_behind'] = np.append(data_store[N]['num_blocks_behind'], BF.num_blocks_behind_avg)
-      data_store[N]['frac_consistent'] = np.append(data_store[N]['frac_consistent'], BF.num_consistent_peers_avg)
+      for p in processes:
+        p.start()
+      for p in processes:
+        p.join()
 
-      fraction_consistent = BF.num_consistent_peers_avg
-
+      data = [output.get() for p in processes]
+      data_store[N]['busy_period'].append([block_rate, np.mean([i[0] for i in data]), np.std([i[0] for i in data])])
+      data_store[N]['cycle_length'].append([block_rate, np.mean([i[1] for i in data]), np.std([i[1] for i in data])])
+      data_store[N]['age_of_information'].append([block_rate, np.mean([i[2] for i in data]), np.std([i[2] for i in data])])
+      data_store[N]['consistency_fraction'].append([block_rate, np.mean([i[3] for i in data]), np.std([i[3] for i in data])])
+      data_store[N]['growth_rate'].append([block_rate, np.mean([i[4] for i in data]), np.std([i[4] for i in data])])
+      
+      frac_consistent = np.mean([i[3] for i in data])
       block_rate += 0.01
 
-    max_block_rates = np.append(max_block_rates, block_rate)
 
-
-  print data_store  
-
+  print data_store
 if __name__=='__main__':
   main()
